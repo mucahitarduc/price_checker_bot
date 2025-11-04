@@ -5,5 +5,12 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [
+    "aiohttp==3.8.4",
+    "apscheduler==3.10.1",
+    "beautifulsoup4==4.12.2",
+    "python-dotenv==1.0.0",
+    "python-telegram-bot==20.8",
+    "requests==2.31.0",
+    "sqlalchemy==2.0.18",
     "watchdog>=6.0.0",
 ]
