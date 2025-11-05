@@ -53,14 +53,18 @@ async def check_product(product_id, bot):
     logger.info("Product %s price: %s (previous: %s)", p.id, price, last_price)
 
     # if price decreased vs last_price -> notify subscribers
-    if last_price is not None and price < last_price:
+    if price != last_price:
         subs = session.query(Subscription).filter_by(product_id=p.id, active=True).all()
         for s in subs:
             user = session.query(User).filter_by(id=s.user_id).first()
             if not user:
                 continue
-            text = (f"Fiyat düştü!\n{p.title or p.url}\n"
-                    f"Yeni fiyat: {price:.2f} TL (önceki: {last_price:.2f} TL)\n{p.url}")
+            if (price < last_price):
+                text = (f"Fiyat düştü!\n{p.title or p.url}\n"
+                        f"Yeni fiyat: {price:.2f} TL (önceki: {last_price:.2f} TL)\n")
+            else:
+                text = (f"Fiyat güncellendi.\n{p.title or p.url}\n"
+                        f"Yeni fiyat: {price:.2f} TL (önceki: {last_price:.2f} TL)\n")
             try:
                 await bot.send_message(chat_id=int(user.telegram_id), text=text)
             except Exception:

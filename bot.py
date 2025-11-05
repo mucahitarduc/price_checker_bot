@@ -9,6 +9,7 @@ from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, Messa
 from db import init_db, User, Product, PriceLog, Subscription
 from scraper import fetch_price
 from utils import domain_from_url
+from scheduler import check_product
 
 from sqlalchemy.exc import IntegrityError
 import datetime
@@ -44,7 +45,7 @@ async def list_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
         # son log
         last = session.query(PriceLog).filter_by(product_id=p.id).order_by(PriceLog.checked_at.desc()).first()
         price_str = f"{last.price:.2f}" if last else "bilinmiyor"
-        lines.append(f"ID:{p.id} - {p.title or p.url}\nFiyat: {price_str} - {p.url}")
+        lines.append(f"ID:{p.id} - {p.title or p.url}\nFiyat: {price_str}")
     await update.message.reply_text("\n\n".join(lines[:20]))
 
 async def stop_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -70,6 +71,26 @@ async def stop_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
     sub.active = False
     session.commit()
     await update.message.reply_text(f"Takip durduruldu: {pid}")
+
+async def update_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = str(update.effective_user.id)
+    session = Session()
+    user = session.query(User).filter_by(telegram_id=chat_id).first()
+    if not user:
+        await update.message.reply_text("Kayıtlı kullanıcı bulunamadı.")
+        return
+    subs = session.query(Subscription).filter_by(user_id=user.id, active=True).all()
+    if not subs:
+        await update.message.reply_text("Aktif takip yok.")
+        return
+    count = 0
+    for s in subs:
+        try:
+            await check_product(s.product_id, context.bot)
+            count += 1
+        except Exception as e:
+            logger.exception("Error updating product %s", s.product_id)
+    await update.message.reply_text(f"Güncelleme tamamlandı. {count} ürün kontrol edildi.")
 
 async def link_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = (update.message.text or "").strip()
@@ -136,6 +157,7 @@ def build_app(token: str):
     app.add_handler(CommandHandler("help", help_cmd))
     app.add_handler(CommandHandler("list", list_cmd))
     app.add_handler(CommandHandler("stop", stop_cmd))
+    app.add_handler(CommandHandler("update", update_cmd))
     app.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), link_handler))
     return app
 
